@@ -32,9 +32,36 @@ using CompiladorAula;
             List<Token> tokens = lexer.ScanTokens();
 
             // Print tokens
-            foreach (Token token in tokens)
+            //foreach (Token token in tokens)
+            //{
+            //    Console.WriteLine(token);
+            //}
+
+            // Create a parser and generate AST
+            Parser parser = new Parser(tokens);
+            List<Stmt> statements = parser.Parse();
+            
+            // Check for parsing errors
+            List<string> errors = parser.GetErrors();
+            if (errors.Count > 0)
             {
-                Console.WriteLine(token);
+                foreach (string error in errors)
+                {
+                    Console.WriteLine(error);
+                }
+                return;
             }
+            
+            // Print AST (simple representation)
+            Console.WriteLine("Parsing successful! AST created with " + statements.Count + " statements.");
+            
+            // To properly display the AST, we would implement a visitor pattern
+            // For now, we'll just print the type of each statement
+            foreach (Stmt stmt in statements)
+            {
+                Console.WriteLine("Statement type: " + stmt.GetType().Name);
+            }
+
+
         }
     }

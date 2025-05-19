@@ -18,7 +18,7 @@ namespace CompiladorAula
 
 
     // Binary expression (e.g., a + b, x * y)
-    public class BinaryExpr : AstNode 
+    public class BinaryExpr : Expr 
     {
         public Expr Left { get; }
         public Token Operator { get; }
