@@ -8,7 +8,7 @@ namespace CompiladorAula
 {
     public abstract class AstNode
     {
-
+        public abstract T Accept<T>(IAstVisitor<T> visitor);
     }
 
     public abstract class Expr : AstNode
@@ -30,6 +30,11 @@ namespace CompiladorAula
             Operator = op;
             Right = right;
         }
+
+        public override T Accept<T>(IAstVisitor<T> visitor)
+        {
+            return visitor.VisitBinaryExpr(this);
+        }
     }
 
     // Literal expression (e.g., 42, "hello")
@@ -43,6 +48,11 @@ namespace CompiladorAula
             Value = value;
             Type = type;
         }
+
+        public override T Accept<T>(IAstVisitor<T> visitor)
+        {
+            return visitor.VisitLiteralExpr(this);
+        }
     }
 
     // Variable reference expression (e.g., x, counter)
@@ -53,6 +63,11 @@ namespace CompiladorAula
         public VariableExpr(Token name)
         {
             Name = name;
+        }
+
+        public override T Accept<T>(IAstVisitor<T> visitor)
+        {
+            return visitor.VisitVariableExpr(this);
         }
     }
 
@@ -66,6 +81,11 @@ namespace CompiladorAula
         {
             Name = name;
             Value = value;
+        }
+
+        public override T Accept<T>(IAstVisitor<T> visitor)
+        {
+            return visitor.VisitAsignExpr(this);
         }
     }
 
@@ -83,6 +103,11 @@ namespace CompiladorAula
         {
             Expression = expression;
         }
+
+        public override T Accept<T>(IAstVisitor<T> visitor)
+        {
+            return visitor.VisitExpressionStmt(this);
+        }
     }
 
     // Print statement (e.g., print x;)
@@ -93,6 +118,11 @@ namespace CompiladorAula
         public PrintStmt(Expr expression)
         {
             Expression = expression;
+        }
+
+        public override T Accept<T>(IAstVisitor<T> visitor)
+        {
+            return visitor.VisitPrintStmt(this);
         }
     }
 
@@ -110,6 +140,11 @@ namespace CompiladorAula
             Type = type;
             Initializer = initializer;
         }
+
+        public override T Accept<T>(IAstVisitor<T> visitor)
+        {
+            return visitor.VisitVarDeclarationStmt(this);
+        }
     }
 
     // Block statement (a sequence of statements)
@@ -120,6 +155,11 @@ namespace CompiladorAula
         public BlockStmt(List<Stmt> statements)
         {
             Statements = statements;
+        }
+
+        public override T Accept<T>(IAstVisitor<T> visitor)
+        {
+            return visitor.VisitBlockStmt(this);
         }
     }
 
@@ -136,6 +176,11 @@ namespace CompiladorAula
             ThenBranch = thenBranch;
             ElseBranch = elseBranch;
         }
+
+        public override T Accept<T>(IAstVisitor<T> visitor)
+        {
+            return visitor.VisitIfStmt(this);
+        }
     }
 
     // While statement
@@ -148,6 +193,11 @@ namespace CompiladorAula
         {
             Condition = condition;
             Body = body;
+        }
+
+        public override T Accept<T>(IAstVisitor<T> visitor)
+        {
+            return visitor.VisitWhileStmt(this);
         }
     }
 }
