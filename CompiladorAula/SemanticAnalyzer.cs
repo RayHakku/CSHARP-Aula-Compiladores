@@ -55,9 +55,11 @@ namespace CompiladorAula
             }
             else if (stmt is IfStmt ifStmt)
             {
-                // Check if condition is boolean
+                // Verificar a condição
                 TokenTypes conditionType = EvaluateExpr(ifStmt.Condition);
-                if (conditionType != TokenTypes.UNKNOWN && conditionType != TokenTypes.INTEGER)  // Using INTEGER as boolean in our simple language
+
+                // Verificar se é uma expressão booleana
+                if (conditionType != TokenTypes.BOOLEAN && !IsComparisonExpression(ifStmt.Condition))
                 {
                     ReportError(ifStmt.Condition, "Condition must be a boolean expression.");
                 }
@@ -70,15 +72,18 @@ namespace CompiladorAula
             }
             else if (stmt is WhileStmt whileStmt)
             {
-                // Check if condition is boolean
+                // Verificar a condição
                 TokenTypes conditionType = EvaluateExpr(whileStmt.Condition);
-                if (conditionType != TokenTypes.UNKNOWN && conditionType != TokenTypes.INTEGER)  // Using INTEGER as boolean in our simple language
+
+                // Verificar se é uma expressão booleana
+                if (conditionType != TokenTypes.BOOLEAN && !IsComparisonExpression(whileStmt.Condition))
                 {
                     ReportError(whileStmt.Condition, "Condition must be a boolean expression.");
                 }
 
                 AnalyzeStatement(whileStmt.Body);
             }
+
             else if (stmt is PrintStmt printStmt)
             {
                 // Any expression can be printed
@@ -88,6 +93,29 @@ namespace CompiladorAula
             {
                 EvaluateExpr(exprStmt.Expression);
             }
+        }
+
+        private bool IsComparisonExpression(Expr expr)
+        {
+            if (expr is BinaryExpr binaryExpr)
+            {
+                switch (binaryExpr.Operator.Type)
+                {
+                    case TokenTypes.EQUAL:
+                    case TokenTypes.NOT_EQUAL:
+                    case TokenTypes.LESS:
+                    case TokenTypes.GREATER:
+                    case TokenTypes.LESS_EQUAL:
+                    case TokenTypes.GREATER_EQUAL:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+
+            // Podemos também permitir literais booleanos (true/false) se sua linguagem os suportar
+
+            return false; // Outras expressões não são consideradas booleanas
         }
 
         // Analyze variable declaration
@@ -113,19 +141,64 @@ namespace CompiladorAula
             {
                 TokenTypes initializerType = EvaluateExpr(varDecl.Initializer);
 
+                // Correção aqui: Mapeamento de tipos literais para tipos de declaração
+                TokenTypes mappedType = MapLiteralToDeclarationType(initializerType);
+
                 // Check type compatibility
-                if (initializerType != TokenTypes.UNKNOWN && initializerType != type)
+                if (initializerType != TokenTypes.UNKNOWN && mappedType != type)
                 {
                     ReportError(varDecl.Initializer, $"Cannot assign {initializerType} to {type} variable '{name}'.");
                 }
             }
         }
 
+        // Função para verificar compatibilidade de tipos numéricos
+        private bool AreNumericTypesCompatible(TokenTypes type1, TokenTypes type2)
+        {
+            TokenTypes mapped1 = MapLiteralToDeclarationType(type1);
+            TokenTypes mapped2 = MapLiteralToDeclarationType(type2);
+
+            return (mapped1 == TokenTypes.INT && mapped2 == TokenTypes.INT) ||
+                   (mapped1 == TokenTypes.INTEGER && mapped2 == TokenTypes.INTEGER) ||
+                   (mapped1 == TokenTypes.INT && mapped2 == TokenTypes.INTEGER) ||
+                   (mapped1 == TokenTypes.INTEGER && mapped2 == TokenTypes.INT);
+        }
+
+        // Função para verificar compatibilidade de tipos de string
+        private bool AreStringTypesCompatible(TokenTypes type1, TokenTypes type2)
+        {
+            TokenTypes mapped1 = MapLiteralToDeclarationType(type1);
+            TokenTypes mapped2 = MapLiteralToDeclarationType(type2);
+
+            return (mapped1 == TokenTypes.STR && mapped2 == TokenTypes.STR) ||
+                   (mapped1 == TokenTypes.STRING && mapped2 == TokenTypes.STRING) ||
+                   (mapped1 == TokenTypes.STR && mapped2 == TokenTypes.STRING) ||
+                   (mapped1 == TokenTypes.STRING && mapped2 == TokenTypes.STR);
+        }
+
+        // Mapeia tipos literais para tipos de declaração
+        private TokenTypes MapLiteralToDeclarationType(TokenTypes literalType)
+        {
+            switch (literalType)
+            {
+                case TokenTypes.INTEGER:
+                    return TokenTypes.INT;
+                case TokenTypes.STRING:
+                    return TokenTypes.STR;
+                case TokenTypes.BOOLEAN:
+                    return TokenTypes.BOOL;
+                default:
+                    return literalType;
+            }
+        }
+
+
         // Evaluate an expression and return its type
         private TokenTypes EvaluateExpr(Expr expr)
         {
             return expr.Accept(this);
         }
+
         public TokenTypes VisitAsignExpr(AssignExpr expr)
         {
             string name = expr.Name.Lexeme;
@@ -141,9 +214,22 @@ namespace CompiladorAula
             TokenTypes valueType = expr.Value.Accept(this);
 
             // Check type compatibility
-            if (valueType != TokenTypes.UNKNOWN && valueType != symbol.Type)
+            if (valueType != TokenTypes.UNKNOWN)
             {
-                ReportError(expr, $"Cannot assign {valueType} to {symbol.Type} variable '{name}'.");
+                if (symbol.Type == TokenTypes.INT &&
+                    (valueType == TokenTypes.INTEGER || valueType == TokenTypes.INT))
+                {
+                    // OK - Compatível
+                }
+                else if (symbol.Type == TokenTypes.STR &&
+                        (valueType == TokenTypes.STRING || valueType == TokenTypes.STR))
+                {
+                    // OK - Compatível
+                }
+                else
+                {
+                    ReportError(expr, $"Cannot assign {valueType} to {symbol.Type} variable '{name}'.");
+                }
             }
 
             // Mark as initialized
@@ -157,8 +243,12 @@ namespace CompiladorAula
             TokenTypes leftType = expr.Left.Accept(this);
             TokenTypes rightType = expr.Right.Accept(this);
 
+            // Mapeie os tipos antes da comparação
+            TokenTypes mappedLeftType = MapLiteralToDeclarationType(leftType);
+            TokenTypes mappedRightType = MapLiteralToDeclarationType(rightType);
+
             // Handle unknown types
-            if (leftType == TokenTypes.UNKNOWN || rightType == TokenTypes.UNKNOWN)
+            if (mappedLeftType == TokenTypes.UNKNOWN || mappedRightType == TokenTypes.UNKNOWN)
             {
                 return TokenTypes.UNKNOWN;
             }
@@ -167,14 +257,15 @@ namespace CompiladorAula
             switch (expr.Operator.Type)
             {
                 case TokenTypes.PLUS:
-                    // String concatenation or numeric addition
-                    if (leftType == TokenTypes.STR && rightType == TokenTypes.STR)
+                    // String concatenation
+                    if (AreStringTypesCompatible(leftType, rightType))
                     {
-                        return TokenTypes.STR;
+                        return TokenTypes.STRING;
                     }
-                    else if (leftType == TokenTypes.INT && rightType == TokenTypes.INT)
+                    // Numeric addition
+                    else if (AreNumericTypesCompatible(leftType, rightType))
                     {
-                        return TokenTypes.INT;
+                        return TokenTypes.INTEGER;
                     }
                     else
                     {
@@ -186,9 +277,9 @@ namespace CompiladorAula
                 case TokenTypes.MULTIPLY:
                 case TokenTypes.DIVIDE:
                     // Numeric operations
-                    if (leftType == TokenTypes.INT && rightType == TokenTypes.INT)
+                    if (AreNumericTypesCompatible(leftType, rightType))
                     {
-                        return TokenTypes.INT;
+                        return TokenTypes.INTEGER;
                     }
                     else
                     {
@@ -198,10 +289,11 @@ namespace CompiladorAula
 
                 case TokenTypes.EQUAL:
                 case TokenTypes.NOT_EQUAL:
-                    // Equality operators
-                    if (leftType == rightType)
+                    // Equality operators - verificar se os tipos são compatíveis
+                    if ((AreNumericTypesCompatible(leftType, rightType)) ||
+                        (AreStringTypesCompatible(leftType, rightType)))
                     {
-                        return TokenTypes.INT; // Using INTEGER as boolean
+                        return TokenTypes.BOOLEAN; // Agora retorna BOOLEAN em vez de INTEGER
                     }
                     else
                     {
@@ -214,9 +306,9 @@ namespace CompiladorAula
                 case TokenTypes.LESS_EQUAL:
                 case TokenTypes.GREATER_EQUAL:
                     // Comparison operators (only for numbers)
-                    if (leftType == TokenTypes.INT && rightType == TokenTypes.INT)
+                    if (AreNumericTypesCompatible(leftType, rightType))
                     {
-                        return TokenTypes.INT; // Using INTEGER as boolean
+                        return TokenTypes.BOOLEAN; // Agora retorna BOOLEAN em vez de INTEGER
                     }
                     else
                     {
@@ -229,19 +321,43 @@ namespace CompiladorAula
             }
         }
 
+
+
         public TokenTypes VisitBlockStmt(BlockStmt stmt)
         {
-            throw new NotImplementedException();
+            foreach (var s in stmt.Statements)
+            {
+                AnalyzeStatement(s);
+            }
+            return TokenTypes.UNKNOWN; // Statements não têm tipo
         }
 
         public TokenTypes VisitExpressionStmt(ExpressionStmt stmt)
         {
-            throw new NotImplementedException();
+            return stmt.Expression.Accept(this);
         }
 
         public TokenTypes VisitIfStmt(IfStmt stmt)
         {
-            throw new NotImplementedException();
+            // Verificar condição
+            TokenTypes conditionType = stmt.Condition.Accept(this);
+            TokenTypes mappedType = MapLiteralToDeclarationType(conditionType);
+
+            if (mappedType != TokenTypes.UNKNOWN &&
+                mappedType != TokenTypes.INT &&
+                mappedType != TokenTypes.INTEGER)
+            {
+                ReportError(stmt.Condition, "Condition must be a boolean expression.");
+            }
+
+            // Analisar branches
+            AnalyzeStatement(stmt.ThenBranch);
+            if (stmt.ElseBranch != null)
+            {
+                AnalyzeStatement(stmt.ElseBranch);
+            }
+
+            return TokenTypes.UNKNOWN; // Statements não têm tipo
         }
 
         public TokenTypes VisitLiteralExpr(LiteralExpr expr)
@@ -251,12 +367,15 @@ namespace CompiladorAula
 
         public TokenTypes VisitPrintStmt(PrintStmt stmt)
         {
-            throw new NotImplementedException();
+            // Qualquer expressão pode ser impressa
+            stmt.Expression.Accept(this);
+            return TokenTypes.UNKNOWN; // Statements não têm tipo
         }
 
         public TokenTypes VisitVarDeclarationStmt(VarDeclarationStmt stmt)
         {
-            throw new NotImplementedException();
+            AnalyzeVarDeclaration(stmt);
+            return TokenTypes.UNKNOWN; // Statements não têm tipo
         }
 
         public TokenTypes VisitVariableExpr(VariableExpr expr)
@@ -284,7 +403,21 @@ namespace CompiladorAula
 
         public TokenTypes VisitWhileStmt(WhileStmt stmt)
         {
-            throw new NotImplementedException();
+            // Verificar condição
+            TokenTypes conditionType = stmt.Condition.Accept(this);
+            TokenTypes mappedType = MapLiteralToDeclarationType(conditionType);
+
+            if (mappedType != TokenTypes.UNKNOWN &&
+                mappedType != TokenTypes.INT &&
+                mappedType != TokenTypes.INTEGER)
+            {
+                ReportError(stmt.Condition, "Condition must be a boolean expression.");
+            }
+
+            // Analisar corpo
+            AnalyzeStatement(stmt.Body);
+
+            return TokenTypes.UNKNOWN; // Statements não têm tipo
         }
 
         private void ReportError(object node, string message)
@@ -293,5 +426,17 @@ namespace CompiladorAula
             // In a real compiler, we would also add the line and column information
             _errors.Add(message);
         }
+
+        private bool AreBooleanTypesCompatible(TokenTypes type1, TokenTypes type2)
+        {
+            TokenTypes mapped1 = MapLiteralToDeclarationType(type1);
+            TokenTypes mapped2 = MapLiteralToDeclarationType(type2);
+
+            return (mapped1 == TokenTypes.BOOL && mapped2 == TokenTypes.BOOL) ||
+                   (mapped1 == TokenTypes.BOOLEAN && mapped2 == TokenTypes.BOOLEAN) ||
+                   (mapped1 == TokenTypes.BOOL && mapped2 == TokenTypes.BOOLEAN) ||
+                   (mapped1 == TokenTypes.BOOLEAN && mapped2 == TokenTypes.BOOL);
+        }
+
     }
 }

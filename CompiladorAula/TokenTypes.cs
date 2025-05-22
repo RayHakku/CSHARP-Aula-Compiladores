@@ -16,6 +16,7 @@ namespace CompiladorAula
         INTEGER,    // Integer literal
         STRING,     // String literal
         IDENTIFIER, // Variable or function name
+        BOOLEAN,
 
         // Keywords
         VAR,        // 'var' keyword
@@ -25,6 +26,7 @@ namespace CompiladorAula
         PRINT,      // 'print' keyword
         INT,        // 'int' type
         STR,        // 'string' type
+        BOOL,
 
         // Operators
         PLUS,       // '+'
