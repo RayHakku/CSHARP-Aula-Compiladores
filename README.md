@@ -22,7 +22,7 @@ A linguagem implementada é uma linguagem de programação simples e imperativa com
 
 ### Exemplo de código na linguagem:
 
-``
+```
 int x = 10; 
 string message = "Hello, World!";
 if (x > 5) { 
@@ -33,7 +33,7 @@ print("x is too small");
 while (x > 0) { 
 x = x - 1; print(x); 
 }
-``
+```
 
 
 ## Componentes do Compilador
